@@ -8,6 +8,7 @@ app.py
   ├─ statflow/data.py        원자료 읽기·프로파일링
   ├─ statflow/planner.py     규칙 기반 fallback planner
   ├─ statflow/llm_planner.py LLM structured-output 신뢰 경계
+  ├─ statflow/research.py    연구 설계·가설·코드북 정규화
   ├─ statflow/validation.py  실행 전 조건 검증
   ├─ statflow/engine.py      SciPy/statsmodels 실제 계산
   └─ statflow/report.py      계산 결과 기반 설명
@@ -17,7 +18,7 @@ app.py
 
 ## Planner 경계
 
-현재 `planner.py`는 API 키 없이 작동하는 규칙 기반 fallback이고, `llm_planner.py`는 특정 SDK에 종속되지 않는 `StructuredOutputProvider` 계약을 제공합니다. 외부 모델 출력은 Pydantic JSON schema로 검증하며 추가 필드를 금지하고, 데이터에 존재하는 변수만 허용하며, 분석 방법별 변수 역할까지 다시 검증한 뒤 `AnalysisPlan`으로 변환합니다. 외부 provider에는 원자료 행이 아니라 변수명·측정수준·유효/결측 N·고유값 수 같은 메타데이터만 기본 전달합니다.
+현재 `planner.py`는 API 키 없이 작동하는 규칙 기반 fallback이고, `llm_planner.py`는 특정 SDK에 종속되지 않는 `StructuredOutputProvider` 계약을 제공합니다. 외부 모델 출력은 Pydantic JSON schema로 검증하며 추가 필드를 금지하고, 데이터에 존재하는 변수만 허용하며, 분석 방법별 변수 역할까지 다시 검증한 뒤 `AnalysisPlan`으로 변환합니다. 외부 provider에는 원자료 행이 아니라 연구 설계 유형·연구가설·검증된 코드북과 변수명·측정수준·유효/결측 N·고유값 수 같은 메타데이터만 전달합니다. 코드북의 변수명은 실제 데이터 열과 일치해야 하며, fallback planner도 연구가설을 변수 역할 추론에 사용합니다. 횡단·종단 등 비실험 설계에서 영향/예측 질문을 받으면 인과효과로 확정하지 않도록 추천 신뢰도를 낮춥니다.
 
 LLM이 담당할 수 있는 영역:
 - 연구 질문에서 변수 역할 후보 추론

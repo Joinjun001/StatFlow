@@ -14,7 +14,7 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from .data import profile_dataset
-from .schema import AnalysisMethod, AnalysisPlan, METHOD_ASSUMPTIONS
+from .schema import AnalysisMethod, AnalysisPlan, METHOD_ASSUMPTIONS, ResearchContext
 
 
 class PlannerOutputError(ValueError):
@@ -78,8 +78,13 @@ def planner_json_schema() -> dict[str, Any]:
     return LLMPlanOutput.model_json_schema()
 
 
-def build_planner_payload(question: str, frame: pd.DataFrame) -> dict[str, Any]:
-    """원자료 행은 보내지 않고 분석 계획에 필요한 변수 메타데이터만 만든다."""
+def build_planner_payload(
+    question: str,
+    frame: pd.DataFrame,
+    context: ResearchContext | None = None,
+) -> dict[str, Any]:
+    """원자료 행은 보내지 않고 연구 맥락과 변수 메타데이터만 만든다."""
+    context = context or ResearchContext()
     profile = profile_dataset(frame)
     variables = []
     for row in profile.to_dict(orient='records'):
@@ -90,8 +95,17 @@ def build_planner_payload(question: str, frame: pd.DataFrame) -> dict[str, Any]:
             'missing_n': int(row['결측 N']),
             'unique_count': int(row['고유값']),
         })
+    codebook = context.codebook_dict()
+    unknown_codebook = sorted(set(codebook) - {str(column) for column in frame.columns})
+    if unknown_codebook:
+        raise PlannerOutputError('코드북에 데이터에 없는 변수가 있습니다: ' + ', '.join(unknown_codebook))
     return {
         'research_question': question,
+        'research_context': {
+            'design': context.design.value,
+            'hypothesis': context.hypothesis,
+            'codebook': codebook,
+        },
         'variables': variables,
         'allowed_methods': [method.value for method in AnalysisMethod],
         'constraints': {
@@ -192,11 +206,12 @@ def plan_with_provider(
     *,
     question: str,
     frame: pd.DataFrame,
+    context: ResearchContext | None = None,
 ) -> LLMPlanningResult:
     """Provider 호출부터 schema/semantic validation까지 한 경계에서 처리한다."""
     raw = provider.generate_structured(
         system_prompt=SYSTEM_PROMPT,
-        input_payload=build_planner_payload(question, frame),
+        input_payload=build_planner_payload(question, frame, context),
         json_schema=planner_json_schema(),
     )
     return parse_llm_plan(raw, question=question, frame=frame)

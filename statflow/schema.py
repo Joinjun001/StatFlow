@@ -1,6 +1,35 @@
-"""StatFlow의 분석 계획과 검증 결과를 표현하는 작은 도메인 모델."""
+"""StatFlow의 연구 맥락, 분석 계획과 검증 결과를 표현하는 도메인 모델."""
 from dataclasses import dataclass, field
 from enum import Enum
+
+
+class ResearchDesign(str, Enum):
+    UNKNOWN = 'unknown'
+    CROSS_SECTIONAL = 'cross_sectional'
+    LONGITUDINAL = 'longitudinal'
+    EXPERIMENTAL = 'experimental'
+    REPEATED_MEASURES = 'repeated_measures'
+
+
+RESEARCH_DESIGN_LABELS = {
+    ResearchDesign.UNKNOWN: '미정 / 잘 모름',
+    ResearchDesign.CROSS_SECTIONAL: '횡단 연구',
+    ResearchDesign.LONGITUDINAL: '종단 연구',
+    ResearchDesign.EXPERIMENTAL: '실험 연구',
+    ResearchDesign.REPEATED_MEASURES: '반복측정 연구',
+}
+
+
+@dataclass(frozen=True)
+class ResearchContext:
+    """분석법 선택에 영향을 주지만 통계 수치를 포함하지 않는 연구 맥락."""
+
+    design: ResearchDesign = ResearchDesign.UNKNOWN
+    hypothesis: str | None = None
+    codebook: tuple[tuple[str, str], ...] = ()
+
+    def codebook_dict(self) -> dict[str, str]:
+        return dict(self.codebook)
 
 
 class AnalysisMethod(str, Enum):

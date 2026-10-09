@@ -101,3 +101,18 @@ def test_report_uses_computed_values(sample):
     text = ' '.join(summarize(plan, result))
     assert 'r=' in text
     assert '인과관계' in text
+
+
+def test_hypothesis_can_supply_variable_roles_to_fallback_planner(sample):
+    from statflow.schema import ResearchContext, ResearchDesign
+
+    context = ResearchContext(
+        design=ResearchDesign.CROSS_SECTIONAL,
+        hypothesis='학습시간이 증가할수록 스트레스점수는 감소할 것이다.',
+    )
+    plan = recommend_plan('두 변수의 관계를 분석하고 싶다.', sample, context)
+    assert plan.method == AnalysisMethod.LINEAR_REGRESSION
+    assert plan.predictors == ('학습시간',)
+    assert plan.outcome == '스트레스점수'
+    assert plan.confidence == 'medium'
+    assert any('인과효과' in line for line in plan.rationale)

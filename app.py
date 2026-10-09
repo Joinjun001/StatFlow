@@ -9,7 +9,11 @@ from statflow.data import DataError, level_map, profile_dataset, quality_message
 from statflow.engine import EngineError, run_analysis
 from statflow.planner import recommend_plan
 from statflow.report import summarize
-from statflow.schema import AnalysisMethod, AnalysisPlan, METHOD_ASSUMPTIONS, METHOD_LABELS
+from statflow.research import ResearchContextError, build_research_context
+from statflow.schema import (
+    AnalysisMethod, AnalysisPlan, METHOD_ASSUMPTIONS, METHOD_LABELS,
+    RESEARCH_DESIGN_LABELS, ResearchDesign,
+)
 from statflow.validation import has_failures, validate_plan
 
 SAMPLE_PATH = Path(__file__).parent / 'sample_data' / 'example_survey.csv'
@@ -61,8 +65,38 @@ with st.expander('데이터/변수 프로파일', expanded=False):
     st.dataframe(profile_dataset(frame), hide_index=True, use_container_width=True)
     st.dataframe(frame.head(20), use_container_width=True)
 
+with st.expander('연구 설계 · 가설 · 코드북', expanded=True):
+    design = st.selectbox(
+        '연구 설계',
+        list(ResearchDesign),
+        format_func=lambda item: RESEARCH_DESIGN_LABELS[item],
+        help='분석 방법과 인과 해석 가능성을 판단하는 데 사용합니다.',
+    )
+    hypothesis = st.text_area(
+        '연구가설 (선택)',
+        placeholder='예: 학습시간이 증가할수록 스트레스점수는 낮아질 것이다.',
+        height=80,
+    )
+    codebook_text = st.text_area(
+        '코드북 (선택)',
+        placeholder='학습시간: 하루 평균 학습시간(시간)\n스트레스점수: 0~10, 높을수록 스트레스가 큼',
+        height=100,
+        help='한 줄에 `변수명: 설명` 형식으로 입력합니다. 원자료 값은 planner에 전달하지 않습니다.',
+    )
+
+try:
+    research_context = build_research_context(
+        design=design,
+        hypothesis=hypothesis,
+        codebook_text=codebook_text,
+        allowed_variables=set(cols),
+    )
+except ResearchContextError as exc:
+    st.error(str(exc))
+    st.stop()
+
 st.subheader('2. 분석 계획')
-proposal = recommend_plan(question, frame)
+proposal = recommend_plan(question, frame, research_context)
 method_index = METHODS.index(proposal.method)
 method = st.selectbox('추천 분석 방법', METHODS, index=method_index, format_func=lambda m: METHOD_LABELS[m])
 
@@ -152,4 +186,4 @@ else:
     with st.expander('계산된 원시 지표'):
         st.json(result.metrics)
 
-st.caption('현재 MVP의 planner는 API 키 없이 동작하는 설명 가능한 규칙 기반 구현입니다. 향후 LLM은 동일한 AnalysisPlan 스키마를 반환하도록 연결합니다.')
+st.caption('현재 화면은 규칙 기반 fallback planner를 사용합니다. 연구 설계·가설·코드북은 LLM planner에도 같은 구조로 전달되며, 원자료 행과 통계 수치는 planner가 생성하지 않습니다.')

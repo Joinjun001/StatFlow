@@ -126,3 +126,26 @@ def test_json_string_is_supported_but_non_object_is_rejected():
 
     with pytest.raises(PlannerOutputError, match='JSON 객체'):
         parse_llm_plan('[]', question='q', frame=frame)
+
+
+def test_payload_includes_research_context_without_raw_data():
+    from statflow.schema import ResearchContext, ResearchDesign
+
+    context = ResearchContext(
+        design=ResearchDesign.CROSS_SECTIONAL,
+        hypothesis='학습시간과 스트레스점수는 관련이 있다.',
+        codebook=(('학습시간', '하루 평균 학습시간(시간)'),),
+    )
+    payload = build_planner_payload('관계를 검토한다.', sample_frame(), context)
+    assert payload['research_context']['design'] == 'cross_sectional'
+    assert payload['research_context']['hypothesis'] == context.hypothesis
+    assert payload['research_context']['codebook']['학습시간'].startswith('하루 평균')
+    assert 'rows' not in payload
+
+
+def test_payload_rejects_unknown_codebook_variable():
+    from statflow.schema import ResearchContext
+
+    context = ResearchContext(codebook=(('없는변수', '설명'),))
+    with pytest.raises(PlannerOutputError, match='코드북'):
+        build_planner_payload('q', sample_frame(), context)
